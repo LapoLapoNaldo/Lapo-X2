@@ -465,7 +465,7 @@ local Capabilities = require("Capabilities")
 local Profiles = require("Profiles")
 local Library = {}
 Library.__index = Library
-Library.Version = "2.0.0-beta.3"
+Library.Version = "2.0.0-beta.4"
 
 local function environment()
     local base = getfenv and getfenv(0) or _G
@@ -797,8 +797,10 @@ end
 
 function Model.new(owner, tab, kind, config, id)
     config = config or {}
+    local text = config.text
+    if text == nil then text = kind == "Separator" and "" or kind end
     local self = setmetatable({ owner = owner, tab = tab, kind = kind, id = id,
-        config = Util.copy(config), text = tostring(config.text or kind),
+        config = Util.copy(config), text = tostring(text),
         description = tostring(config.description or ""), visible = config.visible ~= false,
         disabled = config.disabled == true, busy = false, destroyed = false,
         changed = Signal.new(), updated = Signal.new(), error = nil,
@@ -875,7 +877,7 @@ function Model:Normalize(value)
 end
 
 function Model:Get()
-    if self.kind == "Label" or self.kind == "Paragraph" or self.kind == "Button" then return self.text end
+    if self.kind == "Label" or self.kind == "Paragraph" or self.kind == "Button" or self.kind == "Separator" then return self.text end
     return Util.copy(self.value)
 end
 
@@ -884,7 +886,7 @@ function Model:Set(value, options)
     if self.kind == "Dropdown" and type(value) == "table" and not self.multiple then
         return self:SetOptions(value, options)
     end
-    if self.kind == "Label" or self.kind == "Paragraph" or self.kind == "Button" then
+    if self.kind == "Label" or self.kind == "Paragraph" or self.kind == "Button" or self.kind == "Separator" then
         self.text = tostring(value)
         self.updated:Fire("layout")
         return true
@@ -1372,6 +1374,7 @@ function Native:Height(model, width)
     if model._heightKey == cacheKey then return model._height end
     local base = ({ Button = 44, Toggle = 44, Slider = 60, Dropdown = 68, TextBox = 68,
         NumberInput = 68, Keybind = 48, ColorPicker = 48, Progress = 60, Section = 30, Separator = 12, Label = 30 })[model.kind] or 48
+    if model.kind == "Separator" and model.text ~= "" then base = 30 end
     if touch then
         if model.kind == "Slider" then base = 88
         elseif model.kind == "Progress" then base = 68
@@ -2099,8 +2102,29 @@ local function mount(r, model, scope)
         update = function() section.Text = (model.value and "−  " or "+  ") .. model.text end
     elseif model.kind == "Separator" then
         title.Visible = false
-        r:Make("Frame", { Position = UDim2.fromOffset(inset, 6), Size = UDim2.new(1, -inset * 2, 0, 1),
-            BackgroundTransparency = 0, BackgroundColor3 = "$Border" }, root)
+        local line = r:Make("Frame", { Name = "SeparatorLine", Position = UDim2.fromOffset(inset, 6),
+            Size = UDim2.new(1, -inset * 2, 0, 1), BackgroundTransparency = 0,
+            BackgroundColor3 = "$Line" }, root)
+        local lead = r:Make("Frame", { Name = "SeparatorLead", Position = UDim2.fromOffset(inset, 14),
+            Size = UDim2.fromOffset(8, 1), BackgroundTransparency = 0, BackgroundColor3 = "$Line" }, root)
+        local separatorLabel = r:Make("TextLabel", { Name = "SeparatorLabel", Position = UDim2.fromOffset(inset + 14, 2),
+            Size = UDim2.fromOffset(0, 24), TextSize = 10, Font = Enum.Font.GothamMedium,
+            TextColor3 = "$Subtle", TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd }, root)
+        local tail = r:Make("Frame", { Name = "SeparatorTail", Position = UDim2.fromOffset(inset + 20, 14),
+            Size = UDim2.new(1, -inset * 2 - 20, 0, 1), BackgroundTransparency = 0,
+            BackgroundColor3 = "$Line" }, root)
+        update = function()
+            local labeled = model.text ~= ""
+            line.Visible, lead.Visible, separatorLabel.Visible, tail.Visible = not labeled, labeled, labeled, labeled
+            if not labeled then return end
+            local available = math.max(1, root.AbsoluteSize.X - inset * 2 - 40)
+            local labelWidth = math.min(available, r.textService:GetTextSize(model.text, 10,
+                Enum.Font.GothamMedium, Vector2.new(available, 24)).X)
+            separatorLabel.Text, separatorLabel.Size = model.text, UDim2.fromOffset(labelWidth, 24)
+            tail.Position = UDim2.fromOffset(inset + 20 + labelWidth, 14)
+            tail.Size = UDim2.new(1, -inset * 2 - 20 - labelWidth, 0, 1)
+        end
     else
         title.TextWrapped, title.TextTruncate = true, Enum.TextTruncate.None
         title.Size, title.Position = UDim2.new(1, -inset * 2, 1, -16), UDim2.fromOffset(inset, 8)

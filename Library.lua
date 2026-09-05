@@ -465,7 +465,7 @@ local Capabilities = require("Capabilities")
 local Profiles = require("Profiles")
 local Library = {}
 Library.__index = Library
-Library.Version = "2.0.0-beta.4"
+Library.Version = "2.0.0-beta.5"
 
 local function environment()
     local base = getfenv and getfenv(0) or _G
@@ -2118,9 +2118,10 @@ local function mount(r, model, scope)
             local labeled = model.text ~= ""
             line.Visible, lead.Visible, separatorLabel.Visible, tail.Visible = not labeled, labeled, labeled, labeled
             if not labeled then return end
-            local available = math.max(1, root.AbsoluteSize.X - inset * 2 - 40)
-            local labelWidth = math.min(available, r.textService:GetTextSize(model.text, 10,
-                Enum.Font.GothamMedium, Vector2.new(available, 24)).X)
+            -- The row receives its final size immediately after mounting. Measuring against
+            -- root.AbsoluteSize here used to clamp the label to 1 px on its first render.
+            local labelWidth = r.textService:GetTextSize(model.text, 10,
+                Enum.Font.GothamMedium, Vector2.new(160, 24)).X
             separatorLabel.Text, separatorLabel.Size = model.text, UDim2.fromOffset(labelWidth, 24)
             tail.Position = UDim2.fromOffset(inset + 20 + labelWidth, 14)
             tail.Size = UDim2.new(1, -inset * 2 - 20 - labelWidth, 0, 1)
